@@ -1,0 +1,135 @@
+services:
+  # 1. NGINX GATEWAY
+  gateway:
+    image: nginx:alpine
+    container_name: highfive_gateway
+    restart: unless-stopped
+    ports:
+      - "52:52"
+      #- "443:443"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - frontend
+      - backend_core
+
+  # 2. FRONTEND
+  frontend:
+    image: ghcr.io/plic-mti-highfive/highfive-frontend:${FRONTEND_VERSION:-latest}
+    container_name: highfive_frontend
+    restart: unless-stopped
+
+  # 3. CORE BACKEND
+  backend_core:
+    image: ghcr.io/plic-mti-highfive/highfive-backend-core:${CORE_VERSION:-latest}
+    container_name: highfive_backend_core
+    restart: unless-stopped
+    environment:
+      # Database (PostgreSQL) : Exemple
+      DB_HOST : db
+      DB_PORT : 5432
+      DB_USERNAME : ${POSTGRES_USER:-postgresadmin}
+      DB_PASSWORD : ${POSTGRES_PASSWORD:-postgresadmin}
+      DB_DATABASE : highfive
+      # JWT
+      JWT_ACCESS_SECRET : ${JWT_SECRET:-clee-super-secret}
+      JWT_ACCESS_EXPIRATION : 15m
+      JWT_REFRESH_SECRET : ${JWT_SECRET:-clee-super-secret}
+      JWT_REFRESH_EXPIRATION : 7d
+      # Redis (BullMQ)
+      REDIS_HOST : redis
+      REDIS_PORT : 6379
+      # App
+      PORT : 3000
+      NODE_ENV : development
+    depends_on:
+      db:
+          condition: service_healthy
+      redis:
+          condition: service_healthy
+
+  # 4. CANVAS BACKEND
+  backend_canvas:
+    image: ghcr.io/plic-mti-highfive/highfive-backend-canvas:${CANVAS_VERSION:-latest}
+    container_name: highfive_backend_canvas
+    restart: unless-stopped
+    environment:
+      ENV : dev
+      AWS_REGION : eu-west-3
+      MINIO_USERNAME : ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_PASSWORD : ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_ENDPOINT : http://minio:9000
+      JWT_SECRET : ${JWT_SECRET:-clee-super-secret}
+    depends_on:
+      minio:
+        condition: service_healthy
+
+  # 5. AI BACKEND
+  backend_ai:
+    image: ghcr.io/plic-mti-highfive/highfive-backend-ai:${AI_VERSION:-latest}
+    container_name: highfive_backend_ai
+    restart: unless-stopped
+    environment:
+      DATABASE_URI : postgresql+asyncpg://${POSTGRES_USER:-postgresadmin}:${POSTGRES_PASSWORD:-postgresadmin}@db:5432/highfive
+      REDIS_URI : redis://redis:6379
+      JWT_SECRET : ${JWT_SECRET:-clee-super-secret}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # 6. DATABASE
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: highfive_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER : ${POSTGRES_USER:-postgresadmin}
+      POSTGRES_PASSWORD : ${POSTGRES_PASSWORD:-postgresadmin}
+      POSTGRES_DB : highfive
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgresadmin}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: highfive_redis
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: quay.io/minio/minio
+    container_name: highfive_minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "127.0.0.1:9000:9000"   # API
+      - "127.0.0.1:9001:9001"   # Console
+    volumes:
+      - miniodata:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:
