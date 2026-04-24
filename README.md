@@ -40,15 +40,15 @@ CORE_VERSION=latest
 CANVAS_VERSION=latest
 AI_VERSION=latest
 
-# Base de données
+# DB
 POSTGRES_USER=admin
 POSTGRES_PASSWORD=admin
 
-# MinIO / Storage
+# MinIO
 MINIO_ROOT_USER=minioadmin
 MINIO_ROOT_PASSWORD=minioadmin
 
-# Authentification
+# Secrets
 JWT_SECRET=clee-super-secret
 ```
 
@@ -199,28 +199,6 @@ lsof -i :52
 ## 📝 Scripts
 
 Le dossier `scripts/` contient des utilitaires pour faciliter le développement.
-
-## 🔐 Sécurité
-
-⚠️ **Les identifiants par défaut sont destinés au développement uniquement.**
-
-Pour la production :
-- Changer tous les secrets (`JWT_SECRET`, mots de passe, etc.)
-- Utiliser des secrets Docker/Kubernetes
-- Activer HTTPS (décommenter port 443)
-- Configurer les pare-feu et CORS appropriés
-
-## 📚 Documentation additionnelle
-
-- [Frontend](../highfive-frontend/README.md)
-- [Backend Core](../highfive-backend-core/README.md)
-- [Backend Canvas](../highfive-backend-canvas/README.md)
-- [Backend AI](../highfive-backend-ai/README.md)
-- [Shared Types](../highfive-shared-types/README.md)
-
-## 📄 Changelog
-
-Voir [CHANGELOG.md](CHANGELOG.md)
 
 ---
 
