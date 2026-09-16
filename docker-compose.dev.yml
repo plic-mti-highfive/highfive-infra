@@ -81,6 +81,14 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+    # Sert de signal au job seed (et a toute dependance future) : le
+    # conteneur peut etre "started" avant que Nest n'ecoute vraiment.
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000/api/health/ready']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   # 4. CANVAS BACKEND
   backend_canvas:
@@ -178,6 +186,21 @@ services:
         condition: service_healthy
       backend_ai_migrate:
         condition: service_completed_successfully
+
+  # 6bis. SEED — jeu de demonstration, rejoue par l'API a chaque demarrage.
+  # Idempotent (voir core_backend/scripts/seed.mjs) : sans effet si les
+  # comptes/projets de demo existent deja, donc pas besoin de le lancer a la
+  # main apres un `make up`/`make local`.
+  seed:
+    image: ghcr.io/plic-mti-highfive/highfive-backend-core:${CORE_VERSION:-latest}
+    container_name: highfive_seed
+    restart: "no"
+    command: ["node", "scripts/seed.mjs"]
+    environment:
+      API_URL: http://backend_core:3000
+    depends_on:
+      backend_core:
+        condition: service_healthy
 
   # 6. DATABASE
   db:

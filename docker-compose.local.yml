@@ -27,6 +27,10 @@ services:
     ports:
       - "127.0.0.1:${CORE_HOST_PORT:-3000}:3000"
 
+  # Meme image que backend_core, deja construite ci-dessus : pas de build ici.
+  seed:
+    image: highfive-backend-core:local
+
   backend_canvas:
     image: highfive-backend-canvas:local
     build:
