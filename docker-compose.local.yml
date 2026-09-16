@@ -22,9 +22,8 @@ services:
       context: ${REPOS_DIR:-..}/${CORE_DIR:-core_backend}
       dockerfile: Dockerfile
     pull_policy: build
-    # Le front est construit avec VITE_API_URL par defaut a http://localhost:3000
-    # (cf. src/api/config.ts) : on expose le core sur ce port pour que le build
-    # local fonctionne sans variable supplementaire. Le CORS du core est en *.
+    # Expose pour deboguer l'API sans passer par la gateway. Le front n'en
+    # depend plus : depuis la 2.0.1 il appelle l'origine de la page.
     ports:
       - "127.0.0.1:${CORE_HOST_PORT:-3000}:3000"
 

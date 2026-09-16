@@ -63,7 +63,7 @@ make up
 `make up` (ou simplement `make`) crée le `.env` si besoin, récupère les images
 depuis ghcr.io, lance les services et attend qu'ils soient tous *healthy*.
 
-Les versions v2 publiées sont épinglées dans `.env.exemple` : front `2.0.0`,
+Les versions v2 publiées sont épinglées dans `.env.exemple` : front `2.0.1`,
 core `2.0.0`, canvas `2.0.0`, IA `2.1.1`.
 
 ### Démarrer depuis les dépôts locaux
@@ -97,8 +97,8 @@ make local-down                # arret
 ```
 
 En mode local, le backend core est aussi exposé en direct sur
-`http://localhost:3000` (`CORE_HOST_PORT`), car le front est construit avec
-`VITE_API_URL=http://localhost:3000` par défaut.
+`http://localhost:3000` (`CORE_HOST_PORT`), pour déboguer l'API sans passer par
+la gateway.
 
 ### Autres commandes
 
