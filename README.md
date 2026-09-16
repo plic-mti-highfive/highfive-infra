@@ -64,7 +64,7 @@ make up
 depuis ghcr.io, lance les services et attend qu'ils soient tous *healthy*.
 
 Les versions v2 publiées sont épinglées dans `.env.exemple` : front `2.0.1`,
-core `2.0.0`, canvas `2.0.0`, IA `2.1.1`.
+core `2.0.1`, canvas `2.0.0`, IA `2.1.1`.
 
 ### Démarrer depuis les dépôts locaux
 
