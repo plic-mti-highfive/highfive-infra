@@ -54,32 +54,44 @@ JWT_SECRET=clee-super-secret
 
 ## 🚀 Démarrage
 
-### Démarrer tous les services
+Une seule commande démarre toute la stack :
 
 ```bash
-docker compose -f docker-compose.dev.yml up -d
+make up
 ```
 
-### Vérifier le statut
+`make up` (ou simplement `make`) crée le `.env` si besoin, récupère les images
+depuis ghcr.io, lance les 9 services et attend qu'ils soient tous *healthy*.
+
+### Autres commandes
 
 ```bash
-docker compose -f docker-compose.dev.yml ps
+make ps                  # etat des services
+make logs                # logs de tous les services
+make logs S=backend_core # logs d'un seul service
+make pull                # recupere les dernieres images
+make restart             # redemarre la stack
+make down                # arrete la stack (volumes conserves)
+make reset               # arrete et SUPPRIME les volumes (destructif, demande confirmation)
+make help                # liste les cibles
 ```
 
-### Consulter les logs
+Les images sont privées sur ghcr.io, un login est nécessaire une fois :
 
 ```bash
-# Tous les services
-docker compose -f docker-compose.dev.yml logs -f
-
-# Un service spécifique
-docker compose -f docker-compose.dev.yml logs -f backend_core
+echo $GITHUB_TOKEN | docker login ghcr.io -u <user> --password-stdin
 ```
 
-### Arrêter les services
+### Conflits de ports
 
-```bash
-docker compose -f docker-compose.dev.yml down
+Si un autre projet occupe déjà un port, il suffit de le changer dans `.env` —
+aucune modification du compose n'est nécessaire :
+
+```env
+GATEWAY_PORT=52
+DB_HOST_PORT=5432
+MINIO_HOST_PORT=9000
+MINIO_CONSOLE_PORT=9001
 ```
 
 ## 📍 Accès aux services
@@ -163,7 +175,7 @@ miniodata    → Fichiers MinIO
 Pour nettoyer les volumes (⚠️ destructif) :
 
 ```bash
-docker volume rm highfive_pgdata highfive_redisdata highfive_miniodata
+make reset
 ```
 
 ## 🔧 Dépannage
@@ -172,7 +184,7 @@ docker volume rm highfive_pgdata highfive_redisdata highfive_miniodata
 
 ```bash
 # Vérifier les logs
-docker compose -f docker-compose.dev.yml logs
+make logs
 
 # Vérifier les ressources disponibles
 docker stats
@@ -182,7 +194,7 @@ docker stats
 
 ```bash
 # Vérifier que PostgreSQL est healthy
-docker compose -f docker-compose.dev.yml ps db
+make ps
 
 # Attendre 10-15 secondes après le démarrage
 ```
@@ -195,10 +207,6 @@ lsof -i :52
 
 # Ou changer le port dans docker-compose.dev.yml
 ```
-
-## 📝 Scripts
-
-Le dossier `scripts/` contient des utilitaires pour faciliter le développement.
 
 ---
 

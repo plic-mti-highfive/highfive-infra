@@ -5,13 +5,15 @@ services:
     container_name: highfive_gateway
     restart: unless-stopped
     ports:
-      - "52:52"
+      - "${GATEWAY_PORT:-52}:52"
       #- "443:443"
     volumes:
       - ./config/default.conf:/etc/nginx/conf.d/default.conf
     depends_on:
       - frontend
       - backend_core
+      - backend_canvas
+      - backend_ai_api
 
   # 2. FRONTEND
   frontend:
@@ -74,12 +76,13 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       JWT_SECRET : ${JWT_SECRET:-clee-super-secret}
+      OPENAI_API_KEY : ${OPENAI_API_KEY}
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-  
+
   backend_ai_worker:
     image: ghcr.io/plic-mti-highfive/highfive-backend-ai-worker:${AI_VERSION:-latest}
     container_name: highfive_backend_ai_worker
@@ -88,6 +91,8 @@ services:
       DATABASE_URI : postgresql+asyncpg://${POSTGRES_USER:-postgresadmin}:${POSTGRES_PASSWORD:-postgresadmin}@db:5432/highfive
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      JWT_SECRET : ${JWT_SECRET:-clee-super-secret}
+      OPENAI_API_KEY : ${OPENAI_API_KEY}
     depends_on:
       db:
         condition: service_healthy
@@ -104,7 +109,7 @@ services:
       POSTGRES_PASSWORD : ${POSTGRES_PASSWORD:-postgresadmin}
       POSTGRES_DB : highfive
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${DB_HOST_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -133,8 +138,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
     ports:
-      - "127.0.0.1:9000:9000"   # API
-      - "127.0.0.1:9001:9001"   # Console
+      - "127.0.0.1:${MINIO_HOST_PORT:-9000}:9000"   # API
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"   # Console
     volumes:
       - miniodata:/data
     command: server /data --console-address ":9001"
