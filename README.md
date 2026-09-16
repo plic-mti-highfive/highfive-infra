@@ -63,6 +63,12 @@ make up
 `make up` (ou simplement `make`) crée le `.env` si besoin, récupère les images
 depuis ghcr.io, lance les 9 services et attend qu'ils soient tous *healthy*.
 
+> ⚠️ **Les images publiées sur ghcr.io sont encore en v1.** Le tag `latest` du
+> front date du 15/07 et précède toute la refonte v2. La gateway a été alignée
+> sur le contrat v2 (le core sert désormais ses routes sous `/api`), donc
+> `make up` sert une interface obsolète et renvoie des 404 sur l'API tant que
+> la CI n'a pas publié d'images v2. En attendant, utiliser `make local`.
+
 ### Démarrer depuis les dépôts locaux
 
 Pour tester tes modifications non publiées, `make local` construit chaque
@@ -132,23 +138,26 @@ MINIO_CONSOLE_PORT=9001
 
 Une fois démarrés, les services sont accessible via :
 
-| Service | URL | Port |
-|---------|-----|------|
-| **Frontend** | http://localhost:52 | 52 |
-| **API Core** | http://localhost:52/api | 52 (via NGINX) |
-| **API AI** | http://localhost:52/ai | 52 (via NGINX) |
-| **WebSocket Canvas** | ws://localhost:52/ws | 52 (via NGINX) |
-| **PostgreSQL** | localhost:5432 | 5432 |
-| **Redis** | localhost:6379 | 6379 |
-| **MinIO API** | http://localhost:9000 | 9000 |
-| **MinIO Console** | http://localhost:9001 | 9001 |
+| Service | URL par défaut | Variable |
+|---------|----------------|----------|
+| **Frontend** | http://localhost:52 | `GATEWAY_PORT` |
+| **API Core** | http://localhost:52/api | via NGINX |
+| **API AI** | http://localhost:52/ai | via NGINX |
+| **WebSocket Canvas** | ws://localhost:52/ws | via NGINX |
+| **PostgreSQL** | localhost:5432 | `DB_HOST_PORT` |
+| **MinIO API** | http://localhost:9000 | `MINIO_HOST_PORT` |
+| **MinIO Console** | http://localhost:9001 | `MINIO_CONSOLE_PORT` |
+| **API Core (direct)** | http://localhost:3000 | `CORE_HOST_PORT`, `make local` uniquement |
+
+Redis n'est pas publié sur l'hôte : il n'est joignable que depuis le réseau
+Docker, sous le nom `redis`.
 
 ## 🏗️ Architecture des services
 
 ### Gateway (NGINX)
 
 Reverse proxy responsable du routage :
-- `/api/*` → Backend Core (port 3000)
+- `/api/*` → Backend Core (port 3000), préfixe `/api` conservé
 - `/ai/*` → Backend AI (port 8000)
 - `/ws/*` → Backend Canvas (port 8585)
 
@@ -159,7 +168,7 @@ Services principaux via API REST :
 - Gestion des projets
 - Gestion des utilisateurs
 
-**Accès** : http://localhost:52/api/api/docs (Swagger UI)
+**Accès** : http://localhost:52/api/docs (Swagger UI)
 
 ### Backend Canvas
 
