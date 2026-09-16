@@ -24,6 +24,7 @@ up: .env
 		 exit 1)
 	$(COMPOSE) up -d --wait
 	@$(COMPOSE) restart gateway
+	$(COMPOSE) --profile seed up seed
 	@echo ""
 	@echo "Stack demarree. Front : http://localhost:52"
 	@$(COMPOSE) ps
@@ -33,6 +34,7 @@ local: .env check-repos
 	$(COMPOSE_LOCAL) build
 	$(COMPOSE_LOCAL) up -d --wait
 	@$(COMPOSE_LOCAL) restart gateway
+	$(COMPOSE_LOCAL) --profile seed up seed
 	@echo ""
 	@echo "Stack locale demarree. Front : http://localhost:$${GATEWAY_PORT:-52}"
 	@$(COMPOSE_LOCAL) ps
@@ -47,7 +49,7 @@ local-ps:
 
 ## local-down : arrete la stack locale
 local-down:
-	$(COMPOSE_LOCAL) down
+	$(COMPOSE_LOCAL) --profile seed down
 
 # Verifie que les depots voisins sont bien clones avant de lancer un build.
 check-repos:
@@ -63,7 +65,7 @@ check-repos:
 
 ## down : arrete la stack (les volumes sont conserves)
 down:
-	$(COMPOSE) down
+	$(COMPOSE) --profile seed down
 
 ## restart : redemarre la stack
 restart: down up
@@ -82,12 +84,12 @@ pull:
 
 ## clean : arrete la stack et supprime les conteneurs orphelins
 clean:
-	$(COMPOSE) down --remove-orphans
+	$(COMPOSE) --profile seed down --remove-orphans
 
 ## reset : arrete tout et SUPPRIME les volumes (db, redis, minio) — destructif
 reset:
 	@printf "Supprimer les volumes pgdata/redisdata/miniodata ? [y/N] " && read ans && [ "$$ans" = "y" ]
-	$(COMPOSE) down -v --remove-orphans
+	$(COMPOSE) --profile seed down -v --remove-orphans
 
 # Cree le .env au premier lancement a partir du modele.
 .env:

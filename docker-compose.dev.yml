@@ -191,7 +191,13 @@ services:
   # Idempotent (voir core_backend/scripts/seed.mjs) : sans effet si les
   # comptes/projets de demo existent deja, donc pas besoin de le lancer a la
   # main apres un `make up`/`make local`.
+  #
+  # Sous profil : `up --wait` echoue des qu'un conteneur se termine, meme en 0.
+  # Le seed est donc lance a part, par `make up` / `make local`, une fois la
+  # stack saine (backend_ai_migrate y echappe car il est declare en
+  # service_completed_successfully d'autres services).
   seed:
+    profiles: ['seed']
     image: ghcr.io/plic-mti-highfive/highfive-backend-core:${CORE_VERSION:-latest}
     container_name: highfive_seed
     restart: "no"
