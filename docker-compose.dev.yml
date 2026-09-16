@@ -27,28 +27,56 @@ services:
     container_name: highfive_backend_core
     restart: unless-stopped
     environment:
-      # Database (PostgreSQL) : Exemple
-      DB_HOST : db
-      DB_PORT : 5432
-      DB_USERNAME : ${POSTGRES_USER:-postgresadmin}
-      DB_PASSWORD : ${POSTGRES_PASSWORD:-postgresadmin}
-      DB_DATABASE : highfive
-      # JWT
-      JWT_ACCESS_SECRET : ${JWT_SECRET:-clee-super-secret}
-      JWT_ACCESS_EXPIRATION : 15m
-      JWT_REFRESH_SECRET : ${JWT_SECRET:-clee-super-secret}
-      JWT_REFRESH_EXPIRATION : 7d
-      # Redis (BullMQ)
-      REDIS_HOST : redis
-      REDIS_PORT : 6379
       # App
-      PORT : 3000
-      NODE_ENV : development
+      PORT: 3000
+      NODE_ENV: development
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      # Database (PostgreSQL)
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USERNAME: ${POSTGRES_USER:-postgresadmin}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgresadmin}
+      DB_DATABASE: highfive
+      # Sessions (jetons opaques : la v2 n'utilise plus de JWT ici)
+      SESSION_TOKEN_PEPPER: ${SESSION_TOKEN_PEPPER:-change-me-pepper}
+      SESSION_TTL_DAYS: ${SESSION_TTL_DAYS:-30}
+      # Redis (files BullMQ vers le service IA)
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # Stockage objet. L'endpoint public sert les URL presignees rendues au
+      # navigateur : il doit etre joignable depuis l'hote, pas depuis le reseau
+      # Docker.
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_ENDPOINT: http://localhost:${MINIO_HOST_PORT:-9000}
+      MINIO_REGION: ${MINIO_REGION:-eu-west-3}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_BUCKET: ${CORE_BUCKET:-highfive-core-bucket}
+      # Service canvas. CANVAS_JWT_SECRET et CANVAS_INTERNAL_SECRET doivent
+      # valoir exactement le JWT_SECRET et l'INTERNAL_SECRET du service canvas.
+      # CANVAS_WS_URL est rendue au navigateur : elle passe par la gateway.
+      CANVAS_URL: http://backend_canvas:8585
+      CANVAS_WS_URL: ws://localhost:${GATEWAY_PORT:-52}/ws
+      CANVAS_JWT_SECRET: ${CANVAS_JWT_SECRET:-change-me-canvas}
+      CANVAS_INTERNAL_SECRET: ${CANVAS_INTERNAL_SECRET:-dev-internal-secret}
+      CANVAS_TOKEN_EXPIRATION: 1h
+      # Service IA (vide desactive les recommandations)
+      AI_URL: http://backend_ai_api:8000
+      AI_TENANT_ID: ${AI_TENANT_ID:-00000000-0000-4000-8000-000000000001}
+      # Doit valoir exactement le JWT_SECRET du service IA.
+      AI_JWT_SECRET: ${JWT_SECRET:-clee-super-secret}
+      AI_TIMEOUT_MS: ${AI_TIMEOUT_MS:-12000}
+      # Generation de taches a partir du Mur
+      OPENAI_TOKEN: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
     depends_on:
       db:
-          condition: service_healthy
+        condition: service_healthy
       redis:
-          condition: service_healthy
+        condition: service_healthy
+      minio:
+        condition: service_healthy
 
   # 4. CANVAS BACKEND
   backend_canvas:
@@ -56,17 +84,46 @@ services:
     container_name: highfive_backend_canvas
     restart: unless-stopped
     environment:
-      ENV : dev
-      AWS_REGION : eu-west-3
-      MINIO_USERNAME : ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_PASSWORD : ${MINIO_ROOT_PASSWORD:-minioadmin}
-      MINIO_ENDPOINT : http://minio:9000
-      JWT_SECRET : ${JWT_SECRET:-clee-super-secret}
+      ENV: dev
+      SERVER_NAME: hocuspocus-server
+      PORT: 8585
+      # s3Config (src/index.ts) ne fixe pas de region : le SDK AWS la lit ici.
+      AWS_REGION: ${MINIO_REGION:-eu-west-3}
+      # Stockage du document Yjs
+      BUCKET_NAME: ${CANVAS_BUCKET:-hocuspocus-bucket-dev}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_USERNAME: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      # Doivent correspondre aux CANVAS_* du core : c'est lui qui signe les
+      # tokens canvas, ce service les verifie.
+      JWT_SECRET: ${CANVAS_JWT_SECRET:-change-me-canvas}
+      INTERNAL_SECRET: ${CANVAS_INTERNAL_SECRET:-dev-internal-secret}
+      # Queue des evenements canvas (chat)
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     depends_on:
       minio:
         condition: service_healthy
+      redis:
+        condition: service_healthy
 
   # 5. AI BACKEND
+  # Les migrations Alembic du service IA ne sont jouees par personne au
+  # demarrage : sans ce service a usage unique, la table `embeddings` n'existe
+  # pas et tout le matchmaking repond 500.
+  backend_ai_migrate:
+    image: ghcr.io/plic-mti-highfive/highfive-backend-ai-api:${AI_VERSION:-latest}
+    container_name: highfive_backend_ai_migrate
+    restart: "no"
+    command: ["uv", "run", "alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URI : postgresql+asyncpg://${POSTGRES_USER:-postgresadmin}:${POSTGRES_PASSWORD:-postgresadmin}@db:5432/highfive
+      JWT_SECRET : ${JWT_SECRET:-clee-super-secret}
+      OPENAI_API_KEY : ${OPENAI_API_KEY}
+    depends_on:
+      db:
+        condition: service_healthy
+
   backend_ai_api:
     image: ghcr.io/plic-mti-highfive/highfive-backend-ai-api:${AI_VERSION:-latest}
     container_name: highfive_backend_ai_api
@@ -82,6 +139,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      backend_ai_migrate:
+        condition: service_completed_successfully
 
   backend_ai_worker:
     image: ghcr.io/plic-mti-highfive/highfive-backend-ai-worker:${AI_VERSION:-latest}
@@ -98,6 +157,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      backend_ai_migrate:
+        condition: service_completed_successfully
 
   # 6. DATABASE
   db:

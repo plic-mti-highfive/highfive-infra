@@ -35,6 +35,13 @@ services:
       dockerfile: Dockerfile
     pull_policy: build
 
+  backend_ai_migrate:
+    image: highfive-backend-ai-api:local
+    build:
+      context: ${REPOS_DIR:-..}/${AI_DIR:-highfive-backend-ai}
+      dockerfile: Dockerfile.api
+    pull_policy: build
+
   backend_ai_api:
     image: highfive-backend-ai-api:local
     build:
