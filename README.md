@@ -63,11 +63,12 @@ make up
 `make up` (ou simplement `make`) crée le `.env` si besoin, récupère les images
 depuis ghcr.io, lance les 9 services et attend qu'ils soient tous *healthy*.
 
-> ⚠️ **Les images publiées sur ghcr.io sont encore en v1.** Le tag `latest` du
-> front date du 15/07 et précède toute la refonte v2. La gateway a été alignée
-> sur le contrat v2 (le core sert désormais ses routes sous `/api`), donc
-> `make up` sert une interface obsolète et renvoie des 404 sur l'API tant que
-> la CI n'a pas publié d'images v2. En attendant, utiliser `make local`.
+> ⚠️ **Le front publié est encore en v1.** Les backends sont sortis en v2 sur
+> ghcr.io (core `2.0.0`, canvas `2.0.0`, IA `2.1.1`, épinglés dans
+> `.env.exemple`), mais `highfive-frontend` n'a pas encore été fusionné dans
+> `main` : son tag `latest` date du 15/07 et précède la refonte v2. `make up`
+> sert donc une interface obsolète, incompatible avec les API v2. Pour une
+> stack complète et coherente, utiliser `make local`.
 
 ### Démarrer depuis les dépôts locaux
 
