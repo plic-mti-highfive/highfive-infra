@@ -10,10 +10,14 @@ services:
     volumes:
       - ./config/default.conf:/etc/nginx/conf.d/default.conf
     depends_on:
-      - frontend
-      - backend_core
-      - backend_canvas
-      - backend_ai_api
+      frontend:
+        condition: service_started
+      backend_core:
+        condition: service_started
+      backend_canvas:
+        condition: service_started
+      backend_ai_api:
+        condition: service_healthy
 
   # 2. FRONTEND
   frontend:
@@ -141,6 +145,21 @@ services:
         condition: service_healthy
       backend_ai_migrate:
         condition: service_completed_successfully
+    # Sans cela, `up --wait` ne fait qu'attendre le demarrage du conteneur et
+    # rend la main avant que uvicorn n'ecoute : la gateway repond alors 502 le
+    # temps que le modele spaCy se charge (~4 s).
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python3',
+          '-c',
+          'import urllib.request;urllib.request.urlopen("http://localhost:8000/api/v1/livez").read()',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   backend_ai_worker:
     image: ghcr.io/plic-mti-highfive/highfive-backend-ai-worker:${AI_VERSION:-latest}
