@@ -1,0 +1,50 @@
+# Surcouche "local" : construit chaque service depuis le clone local du depot
+# voisin au lieu de tirer l'image publiee sur ghcr.io.
+#
+# Usage : `make local` (equivalent de
+#   docker compose -f docker-compose.dev.yml -f docker-compose.local.yml up -d --build)
+#
+# Les depots sont attendus a cote de highfive-infra. REPOS_DIR permet de
+# pointer ailleurs, et chaque depot a sa propre variable si le dossier a ete
+# renomme au clonage.
+
+services:
+  frontend:
+    image: highfive-frontend:local
+    build:
+      context: ${REPOS_DIR:-..}/${FRONTEND_DIR:-highfive-frontend}
+      dockerfile: Dockerfile
+    pull_policy: build
+
+  backend_core:
+    image: highfive-backend-core:local
+    build:
+      context: ${REPOS_DIR:-..}/${CORE_DIR:-core_backend}
+      dockerfile: Dockerfile
+    pull_policy: build
+    # Le front est construit avec VITE_API_URL par defaut a http://localhost:3000
+    # (cf. src/api/config.ts) : on expose le core sur ce port pour que le build
+    # local fonctionne sans variable supplementaire. Le CORS du core est en *.
+    ports:
+      - "127.0.0.1:${CORE_HOST_PORT:-3000}:3000"
+
+  backend_canvas:
+    image: highfive-backend-canvas:local
+    build:
+      context: ${REPOS_DIR:-..}/${CANVAS_DIR:-highfive-backend-canvas}
+      dockerfile: Dockerfile
+    pull_policy: build
+
+  backend_ai_api:
+    image: highfive-backend-ai-api:local
+    build:
+      context: ${REPOS_DIR:-..}/${AI_DIR:-highfive-backend-ai}
+      dockerfile: Dockerfile.api
+    pull_policy: build
+
+  backend_ai_worker:
+    image: highfive-backend-ai-worker:local
+    build:
+      context: ${REPOS_DIR:-..}/${AI_DIR:-highfive-backend-ai}
+      dockerfile: Dockerfile.worker
+    pull_policy: build

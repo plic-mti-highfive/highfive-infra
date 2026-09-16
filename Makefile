@@ -4,9 +4,15 @@
 # Toutes les cibles utilisent docker-compose.dev.yml, plus besoin de passer -f.
 
 COMPOSE := docker compose -f docker-compose.dev.yml
+COMPOSE_LOCAL := $(COMPOSE) -f docker-compose.local.yml
+
+# Emplacement des depots voisins (surchargeable dans .env).
+REPOS_DIR ?= ..
+LOCAL_REPOS := $(REPOS_DIR)/highfive-frontend $(REPOS_DIR)/core_backend \
+               $(REPOS_DIR)/highfive-backend-canvas $(REPOS_DIR)/highfive-backend-ai
 
 .DEFAULT_GOAL := up
-.PHONY: up down restart logs ps pull build clean reset help
+.PHONY: up local local-down local-logs local-ps down restart logs ps pull clean reset help check-repos
 
 ## up : demarre toute la stack et attend que les services soient sains
 up: .env
@@ -17,9 +23,43 @@ up: .env
 		 echo ""; \
 		 exit 1)
 	$(COMPOSE) up -d --wait
+	@$(COMPOSE) restart gateway
 	@echo ""
 	@echo "Stack demarree. Front : http://localhost:52"
 	@$(COMPOSE) ps
+
+## local : construit et demarre la stack depuis les depots clones localement
+local: .env check-repos
+	$(COMPOSE_LOCAL) build
+	$(COMPOSE_LOCAL) up -d --wait
+	@$(COMPOSE_LOCAL) restart gateway
+	@echo ""
+	@echo "Stack locale demarree. Front : http://localhost:$${GATEWAY_PORT:-52}"
+	@$(COMPOSE_LOCAL) ps
+
+## local-logs : logs de la stack locale (make local-logs S=backend_core)
+local-logs:
+	$(COMPOSE_LOCAL) logs -f $(S)
+
+## local-ps : etat de la stack locale
+local-ps:
+	$(COMPOSE_LOCAL) ps
+
+## local-down : arrete la stack locale
+local-down:
+	$(COMPOSE_LOCAL) down
+
+# Verifie que les depots voisins sont bien clones avant de lancer un build.
+check-repos:
+	@missing=""; \
+	for r in $(LOCAL_REPOS); do \
+		[ -d "$$r" ] || missing="$$missing $$r"; \
+	done; \
+	if [ -n "$$missing" ]; then \
+		echo ">> Depots introuvables :$$missing"; \
+		echo ">> Clone-les a cote de highfive-infra, ou definis REPOS_DIR dans .env."; \
+		exit 1; \
+	fi
 
 ## down : arrete la stack (les volumes sont conserves)
 down:

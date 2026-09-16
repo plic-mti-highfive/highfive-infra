@@ -63,6 +63,40 @@ make up
 `make up` (ou simplement `make`) crée le `.env` si besoin, récupère les images
 depuis ghcr.io, lance les 9 services et attend qu'ils soient tous *healthy*.
 
+### Démarrer depuis les dépôts locaux
+
+Pour tester tes modifications non publiées, `make local` construit chaque
+service depuis le clone local du dépôt voisin au lieu de tirer l'image ghcr.io :
+
+```bash
+make local
+```
+
+Les dépôts sont attendus à côté de `highfive-infra` :
+
+```
+plic-repos/
+├── highfive-infra/
+├── highfive-frontend/
+├── core_backend/
+├── highfive-backend-canvas/
+└── highfive-backend-ai/
+```
+
+Si tes clones sont ailleurs, définis `REPOS_DIR` dans `.env` (ou
+`FRONTEND_DIR`, `CORE_DIR`, `CANVAS_DIR`, `AI_DIR` pour un dossier renommé).
+`make local` échoue avec un message explicite si un dépôt manque.
+
+```bash
+make local-ps                  # etat de la stack locale
+make local-logs S=backend_core # logs d'un service
+make local-down                # arret
+```
+
+En mode local, le backend core est aussi exposé en direct sur
+`http://localhost:3000` (`CORE_HOST_PORT`), car le front est construit avec
+`VITE_API_URL=http://localhost:3000` par défaut.
+
 ### Autres commandes
 
 ```bash
