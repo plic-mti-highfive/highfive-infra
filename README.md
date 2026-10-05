@@ -28,7 +28,7 @@ Ce projet orchestrate tous les services nécessaires pour faire fonctionner la p
 Copier le fichier d'exemple et configurer les variables :
 
 ```bash
-cp .env.exemple .env
+cp .env.example .env
 ```
 
 Éditer `.env` avec vos paramètres :
@@ -63,8 +63,23 @@ make up
 `make up` (ou simplement `make`) crée le `.env` si besoin, récupère les images
 depuis ghcr.io, lance les services et attend qu'ils soient tous *healthy*.
 
-Les versions v2 publiées sont épinglées dans `.env.exemple` : front `2.0.1`,
+Les versions v2 publiées sont épinglées dans `.env.example` : front `2.0.1`,
 core `2.0.1`, canvas `2.0.0`, IA `2.1.1`.
+
+### Point d'entrée : `docker-compose.yml`
+
+`docker-compose.yml` décrit toute la stack (gateway, frontend, core, canvas,
+IA api + worker, Postgres/pgvector, Redis, MinIO, seed). Chaque service a une
+section `build` pointant vers le dépôt voisin, donc :
+
+```bash
+docker compose up -d --build --wait   # ou : make build
+```
+
+construit tout depuis les clones locaux ; `make up` tire les images ghcr.io.
+Tous les services ont un healthcheck et les `depends_on` utilisent
+`service_healthy`. Le réseau interne s'appelle `highfive_net`. `LLM_PROVIDER`
+vaut `fake` par défaut (voir `.env.example`).
 
 ### Démarrer depuis les dépôts locaux
 
@@ -245,7 +260,7 @@ make ps
 # Identifier le processus utilisant le port
 lsof -i :52
 
-# Ou changer le port dans docker-compose.dev.yml
+# Ou changer le port dans docker-compose.yml
 ```
 
 ---
