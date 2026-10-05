@@ -78,7 +78,7 @@ docker compose up -d --build --wait   # ou : make build
 
 construit tout depuis les clones locaux ; `make up` tire les images ghcr.io.
 Tous les services ont un healthcheck et les `depends_on` utilisent
-`service_healthy`. Le réseau interne s'appelle `highfive_net`. `LLM_PROVIDER`
+`service_healthy`. Le réseau interne est propre au projet compose (`<projet>_default`). `LLM_PROVIDER`
 vaut `fake` par défaut (voir `.env.example`).
 
 ### Démarrer depuis les dépôts locaux
@@ -163,6 +163,23 @@ Une fois démarrés, les services sont accessible via :
 
 Redis n'est pas publié sur l'hôte : il n'est joignable que depuis le réseau
 Docker, sous le nom `redis`.
+
+## Tests e2e (Playwright)
+
+`e2e/` contient les tests inter-services (connectivite de chaque service via la
+gateway, parcours chat du Mur : `@ia` -> réponse du provider `fake` -> sauvegarde
+Yjs et table `wall_chat_messages`). Ils tournent au niveau API/WebSocket : le
+front ne branche pas encore le Mur, pas besoin de navigateur.
+
+```bash
+docker compose up -d --build --wait && docker compose --profile seed up seed
+make e2e                         # = cd e2e && pnpm install && pnpm test:e2e
+```
+
+URLs surchargeables : `E2E_GATEWAY_URL` (défaut `http://localhost:$GATEWAY_PORT`),
+`E2E_FRONTEND_URL`, `E2E_API_URL`, `E2E_AI_URL`, `E2E_CANVAS_URL`,
+`E2E_CANVAS_WS_URL` ; Postgres (`DB_HOST_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`).
+En CI : `.github/workflows/e2e.yml` (secret `REPOS_TOKEN` pour cloner les dépôts voisins).
 
 ## 🏗️ Architecture des services
 

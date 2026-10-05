@@ -2,7 +2,6 @@ services:
   # 1. NGINX GATEWAY
   gateway:
     image: nginx:alpine
-    container_name: highfive_gateway
     restart: unless-stopped
     ports:
       - "${GATEWAY_PORT:-52}:52"
@@ -30,7 +29,6 @@ services:
     build:
       context: ${REPOS_DIR:-..}/${FRONTEND_DIR:-highfive-frontend}
       dockerfile: Dockerfile
-    container_name: highfive_frontend
     restart: unless-stopped
     healthcheck:
       test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8080/']
@@ -44,7 +42,6 @@ services:
     build:
       context: ${REPOS_DIR:-..}/${CORE_DIR:-core_backend}
       dockerfile: Dockerfile
-    container_name: highfive_backend_core
     restart: unless-stopped
     environment:
       # App
@@ -114,7 +111,6 @@ services:
     build:
       context: ${REPOS_DIR:-..}/${CANVAS_DIR:-highfive-backend-canvas}
       dockerfile: Dockerfile
-    container_name: highfive_backend_canvas
     restart: unless-stopped
     environment:
       ENV: dev
@@ -156,7 +152,6 @@ services:
     build:
       context: ${REPOS_DIR:-..}/${AI_DIR:-highfive-backend-ai}
       dockerfile: Dockerfile.api
-    container_name: highfive_backend_ai_migrate
     restart: "no"
     command: ["uv", "run", "alembic", "upgrade", "head"]
     environment:
@@ -172,7 +167,6 @@ services:
     build:
       context: ${REPOS_DIR:-..}/${AI_DIR:-highfive-backend-ai}
       dockerfile: Dockerfile.api
-    container_name: highfive_backend_ai_api
     restart: unless-stopped
     environment:
       DATABASE_URI : postgresql+asyncpg://${POSTGRES_USER:-postgresadmin}:${POSTGRES_PASSWORD:-postgresadmin}@db:5432/highfive
@@ -208,7 +202,6 @@ services:
     build:
       context: ${REPOS_DIR:-..}/${AI_DIR:-highfive-backend-ai}
       dockerfile: Dockerfile.worker
-    container_name: highfive_backend_ai_worker
     restart: unless-stopped
     environment:
       DATABASE_URI : postgresql+asyncpg://${POSTGRES_USER:-postgresadmin}:${POSTGRES_PASSWORD:-postgresadmin}@db:5432/highfive
@@ -248,7 +241,6 @@ services:
   seed:
     profiles: ['seed']
     image: ghcr.io/plic-mti-highfive/highfive-backend-core:${CORE_VERSION:-latest}
-    container_name: highfive_seed
     restart: "no"
     command: ["node", "scripts/seed.mjs"]
     environment:
@@ -260,7 +252,6 @@ services:
   # 6. DATABASE
   db:
     image: pgvector/pgvector:pg16
-    container_name: highfive_db
     restart: unless-stopped
     environment:
       POSTGRES_USER : ${POSTGRES_USER:-postgresadmin}
@@ -278,7 +269,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: highfive_redis
     restart: unless-stopped
     volumes:
       - redisdata:/data
@@ -290,7 +280,6 @@ services:
 
   minio:
     image: quay.io/minio/minio
-    container_name: highfive_minio
     restart: unless-stopped
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
@@ -316,4 +305,3 @@ volumes:
 # la gateway (et, en 127.0.0.1, db/minio pour le debug) sont publies sur l'hote.
 networks:
   default:
-    name: highfive_net

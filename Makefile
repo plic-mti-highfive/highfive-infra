@@ -12,7 +12,7 @@ LOCAL_REPOS := $(REPOS_DIR)/highfive-frontend $(REPOS_DIR)/core_backend \
                $(REPOS_DIR)/highfive-backend-canvas $(REPOS_DIR)/highfive-backend-ai
 
 .DEFAULT_GOAL := up
-.PHONY: build up local local-down local-logs local-ps down restart logs ps pull clean reset help check-repos
+.PHONY: build up local local-down local-logs local-ps down restart logs ps pull clean reset help check-repos e2e
 
 ## up : demarre toute la stack et attend que les services soient sains
 up: .env
@@ -32,6 +32,10 @@ up: .env
 ## build : construit toutes les images depuis les depots voisins puis demarre (docker compose up -d --build --wait)
 build: .env check-repos
 	$(COMPOSE) up -d --build --wait
+
+## e2e : lance les tests Playwright (connectivite + chat du Mur) contre la stack deja demarree
+e2e: .env
+	cd e2e && pnpm install --frozen-lockfile && set -a && . ../.env && set +a && pnpm test:e2e
 
 ## local : construit et demarre la stack depuis les depots clones localement
 local: .env check-repos
