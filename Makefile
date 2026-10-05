@@ -1,9 +1,9 @@
 # Highfive — orchestration de la stack complete
 #
 # Commande unique : `make up` (ou simplement `make`).
-# Toutes les cibles utilisent docker-compose.dev.yml, plus besoin de passer -f.
+# Toutes les cibles utilisent docker-compose.yml, plus besoin de passer -f.
 
-COMPOSE := docker compose -f docker-compose.dev.yml
+COMPOSE := docker compose -f docker-compose.yml
 COMPOSE_LOCAL := $(COMPOSE) -f docker-compose.local.yml
 
 # Emplacement des depots voisins (surchargeable dans .env).
@@ -12,22 +12,30 @@ LOCAL_REPOS := $(REPOS_DIR)/highfive-frontend $(REPOS_DIR)/core_backend \
                $(REPOS_DIR)/highfive-backend-canvas $(REPOS_DIR)/highfive-backend-ai
 
 .DEFAULT_GOAL := up
-.PHONY: up local local-down local-logs local-ps down restart logs ps pull clean reset help check-repos
+.PHONY: build up local local-down local-logs local-ps down restart logs ps pull clean reset help check-repos e2e
 
 ## up : demarre toute la stack et attend que les services soient sains
 up: .env
-	$(COMPOSE) pull --ignore-buildable || \
+	$(COMPOSE) pull || \
 		(echo ""; \
 		 echo ">> Echec du pull. Les images sont privees sur ghcr.io :"; \
 		 echo ">>   echo \$$GITHUB_TOKEN | docker login ghcr.io -u <user> --password-stdin"; \
 		 echo ""; \
 		 exit 1)
-	$(COMPOSE) up -d --wait
+	$(COMPOSE) up -d --no-build --wait
 	@$(COMPOSE) restart gateway
-	$(COMPOSE) --profile seed up seed
+	$(COMPOSE) --profile seed up --no-build seed
 	@echo ""
 	@echo "Stack demarree. Front : http://localhost:52"
 	@$(COMPOSE) ps
+
+## build : construit toutes les images depuis les depots voisins puis demarre (docker compose up -d --build --wait)
+build: .env check-repos
+	$(COMPOSE) up -d --build --wait
+
+## e2e : lance les tests Playwright (connectivite + chat du Mur) contre la stack deja demarree
+e2e: .env
+	cd e2e && pnpm install --frozen-lockfile && set -a && . ../.env && set +a && pnpm test:e2e
 
 ## local : construit et demarre la stack depuis les depots clones localement
 local: .env check-repos
@@ -93,8 +101,8 @@ reset:
 
 # Cree le .env au premier lancement a partir du modele.
 .env:
-	@cp .env.exemple .env
-	@echo ">> .env cree depuis .env.exemple — renseigne OPENAI_API_KEY avant de continuer."
+	@cp .env.example .env
+	@echo ">> .env cree depuis .env.example — renseigne OPENAI_API_KEY avant de continuer."
 	@exit 1
 
 ## help : liste les cibles disponibles

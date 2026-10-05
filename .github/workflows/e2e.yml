@@ -1,0 +1,114 @@
+name: e2e
+
+# Lance la stack complete (build depuis les depots voisins, LLM_PROVIDER=fake)
+# puis les tests Playwright (connectivite + parcours chat du Mur).
+on:
+  workflow_dispatch:
+    inputs:
+      core_ref:
+        description: Branche/tag du depot core_backend
+        default: dev
+      canvas_ref:
+        description: Branche/tag du depot highfive-backend-canvas
+        default: dev
+  pull_request:
+    paths: ['e2e/**', 'docker-compose.yml', 'config/**', '.github/workflows/e2e.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ORG: plic-mti-highfive
+  GATEWAY_PORT: '52'
+  DB_HOST_PORT: '5432'
+  POSTGRES_USER: postgresadmin
+  POSTGRES_PASSWORD: postgresadmin
+  LLM_PROVIDER: fake
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # Les depots sont prives : REPOS_TOKEN = PAT (ou token d'app) avec acces
+      # en lecture aux 4 depots voisins.
+      - uses: actions/checkout@v4
+        with:
+          path: highfive-infra
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.ORG }}/highfive-frontend
+          token: ${{ secrets.REPOS_TOKEN }}
+          path: highfive-frontend
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.ORG }}/core_backend
+          ref: ${{ inputs.core_ref || 'dev' }}
+          token: ${{ secrets.REPOS_TOKEN }}
+          path: core_backend
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.ORG }}/highfive-backend-canvas
+          ref: ${{ inputs.canvas_ref || 'dev' }}
+          token: ${{ secrets.REPOS_TOKEN }}
+          path: highfive-backend-canvas
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.ORG }}/highfive-backend-ai
+          token: ${{ secrets.REPOS_TOKEN }}
+          path: highfive-backend-ai
+
+      - name: Demarrer la stack
+        working-directory: highfive-infra
+        run: |
+          cp .env.example .env
+          {
+            echo "REPOS_DIR=$GITHUB_WORKSPACE"
+            echo "LLM_PROVIDER=fake"
+            echo "POSTGRES_USER=$POSTGRES_USER"
+            echo "POSTGRES_PASSWORD=$POSTGRES_PASSWORD"
+          } >> .env
+          docker compose up -d --build --wait
+          docker compose --profile seed up seed
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: highfive-infra/e2e/pnpm-lock.yaml
+
+      - name: Installer les dependances e2e
+        working-directory: highfive-infra/e2e
+        run: pnpm install --frozen-lockfile
+
+      - name: Playwright
+        working-directory: highfive-infra/e2e
+        run: pnpm test:e2e
+
+      - name: Logs de la stack (echec)
+        if: failure()
+        working-directory: highfive-infra
+        run: docker compose logs --no-color > stack.log
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: |
+            highfive-infra/e2e/playwright-report
+            highfive-infra/e2e/test-results
+            highfive-infra/stack.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Arreter la stack
+        if: always()
+        working-directory: highfive-infra
+        run: docker compose --profile seed down -v
