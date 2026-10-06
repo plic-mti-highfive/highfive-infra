@@ -40,7 +40,7 @@ services:
   backend_core:
     image: ghcr.io/plic-mti-highfive/highfive-backend-core:${CORE_VERSION:-latest}
     build:
-      context: ${REPOS_DIR:-..}/${CORE_DIR:-core_backend}
+      context: ${REPOS_DIR:-..}/${CORE_DIR:-highfive-backend-core}
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
@@ -230,7 +230,7 @@ services:
       start_period: 10s
 
   # 6bis. SEED — jeu de demonstration, rejoue par l'API a chaque demarrage.
-  # Idempotent (voir core_backend/scripts/seed.mjs) : sans effet si les
+  # Idempotent (voir highfive-backend-core/scripts/seed.mjs) : sans effet si les
   # comptes/projets de demo existent deja, donc pas besoin de le lancer a la
   # main apres un `make up`/`make local`.
   #

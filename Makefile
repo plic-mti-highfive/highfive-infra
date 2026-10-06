@@ -8,7 +8,7 @@ COMPOSE_LOCAL := $(COMPOSE) -f docker-compose.local.yml
 
 # Emplacement des depots voisins (surchargeable dans .env).
 REPOS_DIR ?= ..
-LOCAL_REPOS := $(REPOS_DIR)/highfive-frontend $(REPOS_DIR)/core_backend \
+LOCAL_REPOS := $(REPOS_DIR)/highfive-frontend $(REPOS_DIR)/highfive-backend-core \
                $(REPOS_DIR)/highfive-backend-canvas $(REPOS_DIR)/highfive-backend-ai
 
 .DEFAULT_GOAL := up

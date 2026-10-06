@@ -29,15 +29,15 @@ Ce projet orchestrate tous les services nécessaires pour faire fonctionner la p
 
 ```bash
 mkdir plic-repos && cd plic-repos
-for r in highfive-infra highfive-frontend highfive-backend-canvas highfive-backend-ai; do
+for r in highfive-infra highfive-frontend highfive-backend-core highfive-backend-canvas highfive-backend-ai; do
   git clone git@github.com:plic-mti-highfive/$r.git
 done
-git clone git@github.com:plic-mti-highfive/highfive-backend-core.git core_backend
 cd highfive-infra
 ```
 
-Le core doit être cloné dans `core_backend/`, nom attendu par le compose.
-Sinon, renseigne `CORE_DIR` dans `.env`.
+Les dossiers doivent garder le nom des dépôts (attendus par le compose). Si un
+dossier porte un autre nom, renseigne `FRONTEND_DIR`, `CORE_DIR`, `CANVAS_DIR`
+ou `AI_DIR` dans `.env`.
 
 ### 2. Créer le `.env`
 
@@ -157,7 +157,7 @@ Les dépôts sont attendus à côté de `highfive-infra` :
 plic-repos/
 ├── highfive-infra/
 ├── highfive-frontend/
-├── core_backend/
+├── highfive-backend-core/
 ├── highfive-backend-canvas/
 └── highfive-backend-ai/
 ```

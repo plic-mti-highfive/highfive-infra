@@ -19,7 +19,7 @@ services:
   backend_core:
     image: highfive-backend-core:local
     build:
-      context: ${REPOS_DIR:-..}/${CORE_DIR:-core_backend}
+      context: ${REPOS_DIR:-..}/${CORE_DIR:-highfive-backend-core}
       dockerfile: Dockerfile
     pull_policy: build
     # Expose pour deboguer l'API sans passer par la gateway. Le front n'en

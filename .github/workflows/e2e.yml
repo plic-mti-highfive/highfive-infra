@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       core_ref:
-        description: Branche/tag du depot core_backend
+        description: Branche/tag du depot highfive-backend-core
         default: dev
       canvas_ref:
         description: Branche/tag du depot highfive-backend-canvas
@@ -46,10 +46,10 @@ jobs:
           path: highfive-frontend
       - uses: actions/checkout@v4
         with:
-          repository: ${{ env.ORG }}/core_backend
+          repository: ${{ env.ORG }}/highfive-backend-core
           ref: ${{ inputs.core_ref || 'dev' }}
           token: ${{ secrets.REPOS_TOKEN }}
-          path: core_backend
+          path: highfive-backend-core
       - uses: actions/checkout@v4
         with:
           repository: ${{ env.ORG }}/highfive-backend-canvas
