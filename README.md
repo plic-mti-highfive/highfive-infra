@@ -168,7 +168,7 @@ Docker, sous le nom `redis`.
 
 `e2e/` contient les tests inter-services (connectivite de chaque service via la
 gateway, parcours chat du Mur : `@ia` -> réponse du provider `fake` -> sauvegarde
-Yjs et table `wall_chat_messages`). Ils tournent au niveau API/WebSocket : le
+Yjs et messages de la conversation `wall`). Ils tournent au niveau API/WebSocket : le
 front ne branche pas encore le Mur, pas besoin de navigateur.
 
 ```bash

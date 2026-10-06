@@ -17,8 +17,12 @@ interface WallSession {
 }
 interface ChatBroadcast {
   id: string;
-  text: string;
+  conversationId?: string;
   authorId: string;
+  body: string;
+  sentAt: string;
+  editedAt?: string;
+  deleted: boolean;
   isAssistant?: boolean;
 }
 
@@ -101,24 +105,26 @@ test('parcours chat : @ia repond avec le contexte, puis tout est sauvegarde', as
       // 2 broadcasts : l'echo du message, puis la reponse de l'assistant.
       await expect.poll(() => chats.length - before, { timeout: 20_000 }).toBeGreaterThanOrEqual(2);
       const [echo, answer] = chats.slice(before);
-      expect(echo.text).toBe(text);
+      expect(echo.body).toBe(text);
+      expect(echo.deleted).toBe(false);
+      expect(Number.isNaN(Date.parse(echo.sentAt))).toBe(false);
       expect(echo.isAssistant).toBeFalsy();
       expect(answer.isAssistant).toBe(true);
       return answer;
     };
     const contextSize = (answer: ChatBroadcast) => {
-      const m = answer.text.match(/Contexte : (\d+) message/);
-      expect(m, `reponse inattendue : ${answer.text}`).not.toBeNull();
+      const m = answer.body.match(/Contexte : (\d+) message/);
+      expect(m, `reponse inattendue : ${answer.body}`).not.toBeNull();
       return Number(m![1]);
     };
 
     const first = await ask('@ia propose un nom pour la fresque');
-    expect(first.text).toContain('[assistant simule]');
-    expect(first.text).toContain('propose un nom pour la fresque');
+    expect(first.body).toContain('[assistant simule]');
+    expect(first.body).toContain('propose un nom pour la fresque');
     const n1 = contextSize(first);
 
     const second = await ask('@ia et une palette de couleurs ?');
-    expect(second.text).toContain('une palette de couleurs');
+    expect(second.body).toContain('une palette de couleurs');
     // Le provider fake reflete l'historique : le 2e contexte contient au moins
     // le 1er echange (message + reponse) en plus du nouveau message.
     expect(contextSize(second)).toBeGreaterThanOrEqual(n1 + 2);
@@ -135,40 +141,64 @@ test('parcours chat : @ia repond avec le contexte, puis tout est sauvegarde', as
     const second_client = connect(session);
     await second_client.synced;
     await expect
-      .poll(() => second_client.doc.getArray<{ text: string }>('chat').toArray().length, {
+      .poll(() => second_client.doc.getArray<{ body: string }>('chat').toArray().length, {
         timeout: 15_000,
       })
       .toBeGreaterThanOrEqual(5);
-    const texts = second_client.doc.getArray<{ text: string }>('chat').toArray().map((m) => m.text);
+    const texts = second_client.doc.getArray<{ body: string }>('chat').toArray().map((m) => m.body);
     expect(texts.some((t) => t.includes('message entre humains'))).toBe(true);
     expect(texts.some((t) => t.startsWith('[assistant simule]'))).toBe(true);
     second_client.provider.destroy();
 
-    // Sauvegarde 2 : la table `wall_chat_messages` (saute si la base n'est pas joignable).
+    // Sauvegarde 2 : la messagerie. Les messages du Mur sont des `messages` de la
+    // conversation `kind = 'wall'` du projet (saute si la base n'est pas joignable).
     const client = new pg.Client({ ...db, connectionTimeoutMillis: 3000 });
     const reachable = await client.connect().then(() => true, () => false);
     test.skip(!reachable, `Postgres injoignable sur ${db.host}:${db.port}`);
+    const wallMessages = `select m.id, m.author_id, m.body, c.id as conversation_id
+      from messages m join conversations c on c.id = m.conversation_id
+      where c.kind = 'wall' and c.project_id = $1 order by m.sent_at`;
     try {
       await expect
-        .poll(
-          async () =>
-            (
-              await client.query(
-                'select role, body from wall_chat_messages where project_id = $1 order by sent_at',
-                [projectId],
-              )
-            ).rows.length,
-          { timeout: 15_000 },
-        )
+        .poll(async () => (await client.query(wallMessages, [projectId])).rows.length, {
+          timeout: 15_000,
+        })
         .toBe(5);
       const rows = (
-        await client.query<{ role: string; body: string }>(
-          'select role, body from wall_chat_messages where project_id = $1 order by sent_at',
+        await client.query<{ id: string; author_id: string; body: string; conversation_id: string }>(
+          wallMessages,
           [projectId],
         )
       ).rows;
-      expect(rows.filter((r) => r.role === 'assistant')).toHaveLength(2);
-      expect(rows.filter((r) => r.role !== 'assistant')).toHaveLength(3);
+      const isAssistant = (r: { author_id: string }) =>
+        r.author_id === '00000000-0000-4000-8000-0000000000a1';
+      expect(rows.filter(isAssistant)).toHaveLength(2);
+      expect(rows.filter((r) => !isAssistant(r))).toHaveLength(3);
+      // L'id genere par le canvas est celui du message en base.
+      const ids = new Set(chats.map((c) => c.id));
+      for (const row of rows) expect(ids.has(row.id)).toBe(true);
+
+      // Le chat du Mur reste hors de la messagerie : le canal d'equipe est liste,
+      // pas la conversation `wall`.
+      const wallId = rows[0].conversation_id;
+      await expect
+        .poll(
+          async () => {
+            const res = await request.get(`${urls.api}/conversations`, { headers: bearer(token) });
+            const list = (await res.json()) as { id: string; type: string; projectId?: string }[];
+            return list.some((c) => c.type === 'channel' && c.projectId === projectId);
+          },
+          { timeout: 15_000 },
+        )
+        .toBe(true);
+      const list = (await (
+        await request.get(`${urls.api}/conversations`, { headers: bearer(token) })
+      ).json()) as { id: string }[];
+      expect(list.some((c) => c.id === wallId)).toBe(false);
+      const detail = await request.get(`${urls.api}/conversations/${wallId}`, {
+        headers: bearer(token),
+      });
+      expect(detail.status()).toBe(404);
     } finally {
       await client.end();
     }
