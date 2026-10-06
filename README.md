@@ -229,8 +229,11 @@ Docker, sous le nom `redis`.
 
 `e2e/` contient les tests inter-services (connectivite de chaque service via la
 gateway, parcours chat du Mur : `@ia` -> réponse du provider `fake` -> sauvegarde
-Yjs et messages de la conversation `wall`). Ils tournent au niveau API/WebSocket : le
-front ne branche pas encore le Mur, pas besoin de navigateur.
+Yjs et messages de la conversation `wall`). Ces tests tournent au niveau
+API/WebSocket. `wall-sync-ui.spec.ts` pilote le vrai front dans deux navigateurs
+(Chromium) : un post-it créé dans l'un apparaît dans l'autre, est persisté côté
+serveur, et « Suggérer des tâches (IA) » affiche le 503 français sans clé OpenAI.
+Première fois : `cd e2e && pnpm exec playwright install chromium`.
 
 ```bash
 docker compose up -d --build --wait && docker compose --profile seed up seed
