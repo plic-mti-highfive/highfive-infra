@@ -17,42 +17,103 @@ Ce projet orchestrate tous les services nécessaires pour faire fonctionner la p
 
 ## 🛠️ Prérequis
 
-- Docker & Docker Compose
-- Git (pour cloner le projet)
+- Docker avec le plugin Compose v2 (`docker compose version`)
+- Git, et les 4 dépôts applicatifs clonés à côté de `highfive-infra` (voir
+  [Démarrer depuis les dépôts locaux](#démarrer-depuis-les-dépôts-locaux))
 - Un minimum de 4GB de RAM disponible
+- Node.js + pnpm, uniquement pour les tests e2e
 
-## ⚙️ Configuration
+## ⚡ Lancer la stack (pas à pas)
 
-### 1. Variables d'environnement
+### 1. Cloner les dépôts
 
-Copier le fichier d'exemple et configurer les variables :
+```bash
+mkdir plic-repos && cd plic-repos
+for r in highfive-infra highfive-frontend highfive-backend-canvas highfive-backend-ai; do
+  git clone git@github.com:plic-mti-highfive/$r.git
+done
+git clone git@github.com:plic-mti-highfive/highfive-backend-core.git core_backend
+cd highfive-infra
+```
+
+Le core doit être cloné dans `core_backend/`, nom attendu par le compose.
+Sinon, renseigne `CORE_DIR` dans `.env`.
+
+### 2. Créer le `.env`
 
 ```bash
 cp .env.example .env
 ```
 
-Éditer `.env` avec vos paramètres :
+Les valeurs par défaut suffisent pour un lancement local **sans clé OpenAI**
+(`LLM_PROVIDER=fake`). Pour activer la vraie IA, voir l'étape 3. Le `.env` est
+ignoré par git : n'y commite jamais de clé.
+
+### 3. (Optionnel) Clé OpenAI
+
+Une seule clé, dans le `.env` de l'infra, alimente tous les services :
 
 ```env
-# Versions des images
-FRONTEND_VERSION=latest
-CORE_VERSION=latest
-CANVAS_VERSION=latest
-AI_VERSION=latest
-
-# DB
-POSTGRES_USER=admin
-POSTGRES_PASSWORD=admin
-
-# MinIO
-MINIO_ROOT_USER=minioadmin
-MINIO_ROOT_PASSWORD=minioadmin
-
-# Secrets
-JWT_SECRET=clee-super-secret
+OPENAI_API_KEY=sk-...        # https://platform.openai.com/api-keys
+OPENAI_MODEL=gpt-4o-mini     # modèle utilisé par le core
+LLM_PROVIDER=openai          # assistant @ia du Mur : fake | openai
 ```
 
-## 🚀 Démarrage
+| Service | Variable reçue | Usage | Sans clé |
+|---------|----------------|-------|----------|
+| `backend_core` | `OPENAI_TOKEN` (= `OPENAI_API_KEY`) | assistant `@ia` du chat du Mur (si `LLM_PROVIDER=openai`), génération de tâches depuis le Mur | `@ia` répond `[assistant simule] ...` avec `fake` ; avec `openai` sans clé, message d'erreur en français dans le chat. Génération de tâches : erreur 503 « La generation de taches n'est pas configuree sur ce serveur. » |
+| `backend_ai_api`, `backend_ai_worker` | `OPENAI_API_KEY` | embeddings et recommandations | le worker échoue sur ses jobs (401) ; le core se rabat sur ses règles déterministes, l'application reste utilisable |
+
+`LLM_PROVIDER=fake` donne une réponse déterministe, sans réseau. Garde-le pour
+la CI et les e2e : les tests attendent la réponse `[assistant simule]`.
+
+Après un changement de clé ou de provider, inutile de reconstruire les images :
+`docker compose up -d` recrée les services concernés. Pour vérifier :
+
+```bash
+docker compose exec backend_core printenv LLM_PROVIDER
+```
+
+### 4. Démarrer
+
+Depuis les dépôts locaux (code à jour, **recommandé**) :
+
+```bash
+docker compose up -d --build --wait      # ou : make build
+docker compose --profile seed up seed    # données de démo (une fois)
+```
+
+Ou bien depuis les images publiées sur ghcr.io (`make up`, voir plus bas). Ces
+images sont épinglées dans `.env.example` sur des versions antérieures au
+sprint : elles n'ont ni l'assistant `@ia` ni la messagerie.
+
+Le premier build prend quelques minutes. `--wait` rend la main quand tous les
+services sont *healthy* (`backend_ai_migrate` s'arrête normalement en
+`Exited (0)` : il applique les migrations du service IA).
+
+### 5. Vérifier et se connecter
+
+```bash
+docker compose ps                         # tout doit être "healthy"
+curl http://localhost:52/api/health       # API core
+curl http://localhost:52/api/health/ready # core + db, redis, minio
+```
+
+Front : http://localhost:52. Compte de démo créé par le seed :
+`alex.rivera@example.com` / `demo1234`. Pour avoir un compte administrateur,
+mets son e-mail dans `ADMIN_EMAILS` (liste séparée par des virgules), puis
+lance `docker compose up -d`.
+
+Test de bout en bout (optionnel) : `make e2e` (voir [Tests e2e](#tests-e2e-playwright)).
+
+### 6. Arrêter
+
+```bash
+docker compose --profile seed down      # garde les données
+docker compose --profile seed down -v   # supprime aussi db, redis, minio
+```
+
+## 🚀 Démarrage avec les images ghcr.io
 
 Une seule commande démarre toute la stack :
 
@@ -270,6 +331,14 @@ make ps
 
 # Attendre 10-15 secondes après le démarrage
 ```
+
+### Upload de plus de 1 Mo refusé (413)
+
+La gateway n'a pas de `client_max_body_size` : nginx applique sa limite par
+défaut de 1 Mo. Via `http://localhost:52`, un fichier, un avatar ou un média
+plus gros reçoit une page HTML `413 Request Entity Too Large`. C'est un bug
+connu, pas encore corrigé (il faudra ajouter `client_max_body_size 60m;` dans
+`config/default.conf`).
 
 ### Port déjà utilisé
 
