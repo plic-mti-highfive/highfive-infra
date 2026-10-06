@@ -178,23 +178,27 @@ test('parcours chat : @ia repond avec le contexte, puis tout est sauvegarde', as
       const ids = new Set(chats.map((c) => c.id));
       for (const row of rows) expect(ids.has(row.id)).toBe(true);
 
-      // Le chat du Mur reste hors de la messagerie : le canal d'equipe est liste,
-      // pas la conversation `wall`.
+      // Le chat du Mur reste hors de la messagerie : les canaux d'equipe sont
+      // listes (un canal a un seul membre est masque par la messagerie, d'ou
+      // le canal du seed), jamais une conversation `wall`.
       const wallId = rows[0].conversation_id;
-      await expect
-        .poll(
-          async () => {
-            const res = await request.get(`${urls.api}/conversations`, { headers: bearer(token) });
-            const list = (await res.json()) as { id: string; type: string; projectId?: string }[];
-            return list.some((c) => c.type === 'channel' && c.projectId === projectId);
-          },
-          { timeout: 15_000 },
-        )
-        .toBe(true);
       const list = (await (
         await request.get(`${urls.api}/conversations`, { headers: bearer(token) })
-      ).json()) as { id: string }[];
-      expect(list.some((c) => c.id === wallId)).toBe(false);
+      ).json()) as { id: string; type: string }[];
+      expect(list.some((c) => c.type === 'channel')).toBe(true);
+      const wallIds = new Set(
+        (await client.query<{ id: string }>("select id from conversations where kind = 'wall'")).rows.map(
+          (r) => r.id,
+        ),
+      );
+      expect(wallIds.has(wallId)).toBe(true);
+      expect(list.filter((c) => wallIds.has(c.id))).toEqual([]);
+      // Le projet a bien, en plus, son canal d'equipe `messaging`.
+      const channel = await client.query(
+        "select 1 from conversations where kind = 'messaging' and type = 'channel' and project_id = $1",
+        [projectId],
+      );
+      expect(channel.rowCount).toBe(1);
       const detail = await request.get(`${urls.api}/conversations/${wallId}`, {
         headers: bearer(token),
       });
