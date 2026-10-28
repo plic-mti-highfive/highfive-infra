@@ -71,9 +71,9 @@ test.describe('Mur synchronisé (UI)', () => {
 
       await expect(pageB.locator('.tl-shape', { hasText: text })).toHaveCount(1, { timeout: 20_000 });
 
-      // « Suggérer des tâches (IA) » : sans clé OpenAI, le core répond 503 et
-      // le front affiche son message français (pas de faux succès).
-      await pageA.getByRole('button', { name: 'Suggérer des tâches (IA)' }).click();
+      // « Suggérer des étapes (IA) » (ex-« tâches ») : sans clé OpenAI, le core
+      // répond 503 et le front affiche son message français (pas de faux succès).
+      await pageA.getByRole('button', { name: /Suggérer des (étapes|tâches) \(IA\)/ }).click();
       await expect(pageA.getByRole('alert')).toContainText(/pas configur/i, { timeout: 20_000 });
     } finally {
       await ctxA.close();
