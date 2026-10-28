@@ -148,6 +148,11 @@ jobs:
         working-directory: highfive-infra/e2e
         run: pnpm install --frozen-lockfile
 
+      # Le spec UI (wall-sync-ui) a besoin d'un vrai Chromium, absent du runner.
+      - name: Installer Chromium pour Playwright
+        working-directory: highfive-infra/e2e
+        run: pnpm exec playwright install --with-deps chromium
+
       - name: Playwright
         working-directory: highfive-infra/e2e
         run: pnpm test:e2e
