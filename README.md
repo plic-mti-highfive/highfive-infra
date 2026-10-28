@@ -243,7 +243,64 @@ make e2e                         # = cd e2e && pnpm install && pnpm test:e2e
 URLs surchargeables : `E2E_GATEWAY_URL` (défaut `http://localhost:$GATEWAY_PORT`),
 `E2E_FRONTEND_URL`, `E2E_API_URL`, `E2E_AI_URL`, `E2E_CANVAS_URL`,
 `E2E_CANVAS_WS_URL` ; Postgres (`DB_HOST_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`).
-En CI : `.github/workflows/e2e.yml` (secret `REPOS_TOKEN` pour cloner les dépôts voisins).
+
+### Local jetable : `make e2e-ci`
+
+`make e2e-ci` (= `scripts/e2e-local.sh`) reproduit la CI : projet compose
+`hf-e2e-<aléa>`, ports hôte libres tirés au hasard (gateway, db, MinIO), images
+taguées au nom du projet, `up -d --build --wait`, seed, `pnpm test:e2e`, puis
+`down -v --remove-orphans` + suppression des images du run via `trap`, même en
+échec. Ne touche jamais la stack `infra` en cours ni ses volumes. Sources :
+`REPOS_DIR` (défaut : dossier parent), surcharge par dépôt avec `FRONTEND_DIR`,
+`CORE_DIR`, `CANVAS_DIR`, `AI_DIR`. Arguments Playwright : `./scripts/e2e-local.sh connectivity`.
+
+## CI e2e (à chaque merge sur `main`)
+
+`.github/workflows/e2e.yml` est un workflow **réutilisable** : chaque dépôt
+(frontend, core, canvas, ai, infra) l'appelle à son push sur `main`. Il checkoute
+les 5 dépôts, monte une stack jetable (`COMPOSE_PROJECT_NAME=e2e-<run_id>-<attempt>`,
+`LLM_PROVIDER=fake`), lance Playwright, puis `down -v --remove-orphans` en `always()`.
+Rapport Playwright et logs de la stack en artefacts en cas d'échec.
+
+Déclencheurs : `workflow_call`, `workflow_dispatch` (refs libres), `push` sur
+`main` de l'infra. Pas de `pull_request`.
+
+Refs : chaque input `frontend_ref`, `core_ref`, `canvas_ref`, `ai_ref`, `infra_ref`
+vaut `main` par défaut ; le dépôt appelant passe son `github.sha`. Pour l'infra,
+sur un `push` dans le dépôt infra on teste `github.sha` ; en `workflow_call` /
+`workflow_dispatch` on prend `infra_ref`. Tous les checkouts ont un `repository`
+explicite (sinon `actions/checkout` prendrait le dépôt appelant).
+
+### Prérequis GitHub
+
+- Secret d'organisation `REPOS_TOKEN` : PAT fine-grained, permission *Contents:
+  read* sur les 5 dépôts, accessible aux 5 dépôts (Settings > Secrets > Actions de l'org).
+- Dépôt `highfive-infra` > Settings > Actions > General > *Access* : « Accessible
+  from repositories in the plic-mti-highfive organization » (obligatoire pour
+  appeler un workflow réutilisable d'un dépôt privé).
+
+### Extrait à ajouter dans chaque dépôt
+
+À mettre dans un workflow du dépôt (ex. `.github/workflows/e2e.yml`), en
+remplaçant `<son>_ref` par `frontend_ref`, `core_ref`, `canvas_ref`, `ai_ref` ou
+`infra_ref` selon le dépôt :
+
+```yaml
+name: e2e
+on:
+  push:
+    branches: [main]
+jobs:
+  e2e:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    uses: plic-mti-highfive/highfive-infra/.github/workflows/e2e.yml@main
+    with:
+      <son>_ref: ${{ github.sha }}
+    secrets:
+      REPOS_TOKEN: ${{ secrets.REPOS_TOKEN }}
+```
+
+Cahier de tests : [docs/CAHIER-DE-TESTS.md](docs/CAHIER-DE-TESTS.md).
 
 ## 🏗️ Architecture des services
 

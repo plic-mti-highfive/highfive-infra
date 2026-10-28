@@ -1,30 +1,81 @@
 name: e2e
 
-# Lance la stack complete (build depuis les depots voisins, LLM_PROVIDER=fake)
-# puis les tests Playwright (connectivite + parcours chat du Mur).
+# Lance la stack complete (build depuis les 5 depots, LLM_PROVIDER=fake) puis
+# les tests Playwright. Stack jetable : projet compose unique par run, supprime
+# (conteneurs + volumes) a la fin meme en echec.
+#
+# Declencheurs :
+#  - workflow_call : appele par chaque depot au push sur main (voir README, section
+#    "CI e2e") ; le depot appelant passe son `github.sha` dans son <depot>_ref.
+#  - workflow_dispatch : lancement manuel, refs libres (defaut main).
+#  - push sur main du depot infra.
 on:
+  workflow_call:
+    inputs:
+      frontend_ref:
+        description: Branche, tag ou SHA du depot highfive-frontend
+        type: string
+        default: main
+      core_ref:
+        description: Branche, tag ou SHA du depot highfive-backend-core
+        type: string
+        default: main
+      canvas_ref:
+        description: Branche, tag ou SHA du depot highfive-backend-canvas
+        type: string
+        default: main
+      ai_ref:
+        description: Branche, tag ou SHA du depot highfive-backend-ai
+        type: string
+        default: main
+      infra_ref:
+        description: Branche, tag ou SHA du depot highfive-infra
+        type: string
+        default: main
+    secrets:
+      REPOS_TOKEN:
+        description: PAT fine-grained, lecture du contenu des 5 depots
+        required: true
   workflow_dispatch:
     inputs:
+      frontend_ref:
+        description: Branche, tag ou SHA du depot highfive-frontend
+        type: string
+        default: main
       core_ref:
-        description: Branche/tag du depot highfive-backend-core
-        default: dev
+        description: Branche, tag ou SHA du depot highfive-backend-core
+        type: string
+        default: main
       canvas_ref:
-        description: Branche/tag du depot highfive-backend-canvas
-        default: dev
-  pull_request:
-    paths: ['e2e/**', 'docker-compose.yml', 'config/**', '.github/workflows/e2e.yml']
+        description: Branche, tag ou SHA du depot highfive-backend-canvas
+        type: string
+        default: main
+      ai_ref:
+        description: Branche, tag ou SHA du depot highfive-backend-ai
+        type: string
+        default: main
+      infra_ref:
+        description: Branche, tag ou SHA du depot highfive-infra
+        type: string
+        default: main
+  push:
+    branches: [main]
 
 permissions:
   contents: read
 
 concurrency:
-  group: e2e-${{ github.ref }}
-  cancel-in-progress: true
+  # Dans un workflow reutilisable, `github` est le contexte du depot appelant :
+  # un groupe par depot + ref, sans annuler les runs de main deja en cours.
+  group: e2e-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   ORG: plic-mti-highfive
   GATEWAY_PORT: '52'
   DB_HOST_PORT: '5432'
+  # Stack jetable propre a ce run (aucune collision entre runs sur un meme runner).
+  COMPOSE_PROJECT_NAME: e2e-${{ github.run_id }}-${{ github.run_attempt }}
   POSTGRES_USER: postgresadmin
   POSTGRES_PASSWORD: postgresadmin
   LLM_PROVIDER: fake
@@ -34,31 +85,40 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      # Les depots sont prives : REPOS_TOKEN = PAT (ou token d'app) avec acces
-      # en lecture aux 4 depots voisins.
+      # Les depots sont prives : REPOS_TOKEN = PAT avec lecture sur les 5 depots.
+      # Sans `repository`, actions/checkout prendrait le depot APPELANT (cas
+      # workflow_call) : tous les checkouts sont donc explicites.
+      # Infra : si on tourne dans le depot infra sur push, on teste
+      # exactement le commit declencheur ; sinon (appel d'un autre depot ou
+      # dispatch) on prend infra_ref (defaut main).
       - uses: actions/checkout@v4
         with:
+          repository: ${{ env.ORG }}/highfive-infra
+          ref: ${{ (github.repository == format('{0}/highfive-infra', env.ORG) && github.event_name == 'push') && github.sha || inputs.infra_ref || 'main' }}
+          token: ${{ secrets.REPOS_TOKEN }}
           path: highfive-infra
       - uses: actions/checkout@v4
         with:
           repository: ${{ env.ORG }}/highfive-frontend
+          ref: ${{ inputs.frontend_ref || 'main' }}
           token: ${{ secrets.REPOS_TOKEN }}
           path: highfive-frontend
       - uses: actions/checkout@v4
         with:
           repository: ${{ env.ORG }}/highfive-backend-core
-          ref: ${{ inputs.core_ref || 'dev' }}
+          ref: ${{ inputs.core_ref || 'main' }}
           token: ${{ secrets.REPOS_TOKEN }}
           path: highfive-backend-core
       - uses: actions/checkout@v4
         with:
           repository: ${{ env.ORG }}/highfive-backend-canvas
-          ref: ${{ inputs.canvas_ref || 'dev' }}
+          ref: ${{ inputs.canvas_ref || 'main' }}
           token: ${{ secrets.REPOS_TOKEN }}
           path: highfive-backend-canvas
       - uses: actions/checkout@v4
         with:
           repository: ${{ env.ORG }}/highfive-backend-ai
+          ref: ${{ inputs.ai_ref || 'main' }}
           token: ${{ secrets.REPOS_TOKEN }}
           path: highfive-backend-ai
 
@@ -111,4 +171,4 @@ jobs:
       - name: Arreter la stack
         if: always()
         working-directory: highfive-infra
-        run: docker compose --profile seed down -v
+        run: docker compose --profile seed down -v --remove-orphans
