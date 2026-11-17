@@ -40,8 +40,11 @@ async function createProject(request: APIRequestContext, token: string) {
 async function openWall(page: Page, token: string, slug: string) {
   await page.addInitScript((t) => localStorage.setItem('access_token', t), token);
   await page.goto(`${urls.gateway}/projets/${slug}/lab/mur`);
-  await expect(page.getByText(/synchronisées en temps réel/)).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator('.tl-canvas')).toBeVisible();
+  // Synchronise = le canvas est rendu (il ne l'est qu'une fois la session
+  // prete), sans bandeau de connexion ni d'alerte hors ligne.
+  await expect(page.locator('.tl-canvas')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/Connexion au tableau blanc partagé/)).toBeHidden({ timeout: 30_000 });
+  await expect(page.getByRole('alert')).toHaveCount(0);
 }
 
 test.describe('Mur synchronisé (UI)', () => {
@@ -71,10 +74,13 @@ test.describe('Mur synchronisé (UI)', () => {
 
       await expect(pageB.locator('.tl-shape', { hasText: text })).toHaveCount(1, { timeout: 20_000 });
 
-      // « Suggérer des tâches (IA) » : sans clé OpenAI, le core répond 503 et
-      // le front affiche son message français (pas de faux succès).
+      // « Suggérer des tâches (IA) » : avec une clé OpenAI, le panneau propose
+      // des tâches à créer ; sans clé, le core répond 503 et le front affiche
+      // son message français (pas de faux succès).
       await pageA.getByRole('button', { name: 'Suggérer des tâches (IA)' }).click();
-      await expect(pageA.getByRole('alert')).toContainText(/pas configur/i, { timeout: 20_000 });
+      const proposals = pageA.getByRole('button', { name: /^Créer \d+ tâche/ });
+      const notConfigured = pageA.getByRole('alert').filter({ hasText: /pas configur/i });
+      await expect(proposals.or(notConfigured)).toBeVisible({ timeout: 60_000 });
     } finally {
       await ctxA.close();
       await ctxB.close();
