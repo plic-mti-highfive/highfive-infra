@@ -12,7 +12,7 @@ LOCAL_REPOS := $(REPOS_DIR)/highfive-frontend $(REPOS_DIR)/highfive-backend-core
                $(REPOS_DIR)/highfive-backend-canvas $(REPOS_DIR)/highfive-backend-ai
 
 .DEFAULT_GOAL := up
-.PHONY: build up local local-down local-logs local-ps down restart logs ps pull clean reset help check-repos e2e
+.PHONY: build up local local-down local-logs local-ps down restart logs ps pull clean reset help check-repos e2e e2e-ci
 
 ## up : demarre toute la stack et attend que les services soient sains
 up: .env
@@ -36,6 +36,10 @@ build: .env check-repos
 ## e2e : lance les tests Playwright (connectivite + chat du Mur) contre la stack deja demarree
 e2e: .env
 	cd e2e && pnpm install --frozen-lockfile && set -a && . ../.env && set +a && pnpm test:e2e
+
+## e2e-ci : reproduit la CI en local sur une stack jetable (projet, ports et volumes uniques, nettoyes a la fin)
+e2e-ci:
+	./scripts/e2e-local.sh
 
 ## local : construit et demarre la stack depuis les depots clones localement
 local: .env check-repos

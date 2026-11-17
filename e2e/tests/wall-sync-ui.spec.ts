@@ -74,11 +74,11 @@ test.describe('Mur synchronisé (UI)', () => {
 
       await expect(pageB.locator('.tl-shape', { hasText: text })).toHaveCount(1, { timeout: 20_000 });
 
-      // « Suggérer des tâches (IA) » : avec une clé OpenAI, le panneau propose
+      // « Suggérer des étapes (IA) » (ex-« tâches ») : avec une clé OpenAI, le panneau propose
       // des tâches à créer ; sans clé, le core répond 503 et le front affiche
       // son message français (pas de faux succès).
-      await pageA.getByRole('button', { name: 'Suggérer des tâches (IA)' }).click();
-      const proposals = pageA.getByRole('button', { name: /^Créer \d+ tâche/ });
+      await pageA.getByRole('button', { name: /Suggérer des (étapes|tâches) \(IA\)/ }).click();
+      const proposals = pageA.getByRole('button', { name: /^Créer \d+ (tâche|étape)/ });
       const notConfigured = pageA.getByRole('alert').filter({ hasText: /pas configur/i });
       await expect(proposals.or(notConfigured)).toBeVisible({ timeout: 60_000 });
     } finally {
