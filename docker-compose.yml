@@ -258,6 +258,8 @@ services:
       DB_DATABASE: highfive
       AI_TENANT_ID: ${AI_TENANT_ID:-00000000-0000-4000-8000-000000000001}
       SEED_AI_WAIT_S: ${SEED_AI_WAIT_S:-300}
+      # Photos des fiches telechargees depuis Openverse (0 = aucune).
+      SEED_PHOTOS: ${SEED_PHOTOS:-1}
     depends_on:
       backend_core:
         condition: service_healthy
