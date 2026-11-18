@@ -129,6 +129,8 @@ jobs:
           {
             echo "REPOS_DIR=$GITHUB_WORKSPACE"
             echo "LLM_PROVIDER=fake"
+            # Pas de cle OpenAI en CI : le seed n'attend pas les embeddings.
+            echo "SEED_AI_WAIT_S=0"
             echo "POSTGRES_USER=$POSTGRES_USER"
             echo "POSTGRES_PASSWORD=$POSTGRES_PASSWORD"
           } >> .env
