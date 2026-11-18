@@ -25,6 +25,7 @@ up: .env
 	$(COMPOSE) up -d --no-build --wait
 	@$(COMPOSE) restart gateway
 	$(COMPOSE) --profile seed up --no-build seed
+	$(COMPOSE) --profile seed up --no-build seed_walls
 	@echo ""
 	@echo "Stack demarree. Front : http://localhost:52"
 	@$(COMPOSE) ps
@@ -47,6 +48,7 @@ local: .env check-repos
 	$(COMPOSE_LOCAL) up -d --wait
 	@$(COMPOSE_LOCAL) restart gateway
 	$(COMPOSE_LOCAL) --profile seed up seed
+	$(COMPOSE_LOCAL) --profile seed up seed_walls
 	@echo ""
 	@echo "Stack locale demarree. Front : http://localhost:$${GATEWAY_PORT:-52}"
 	@$(COMPOSE_LOCAL) ps

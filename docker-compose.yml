@@ -266,6 +266,28 @@ services:
       backend_ai_worker:
         condition: service_healthy
 
+  # 6ter. SEED DES MURS — post-its sur le Mur des projets de demo.
+  # Le Mur est un document Yjs servi par le service canvas : il faut un client
+  # Hocuspocus, absent de l'image du core. Le script tourne donc dans l'image
+  # canvas (yjs et @hocuspocus/provider y sont). Sous profil comme `seed`,
+  # idempotent : un Mur deja rempli n'est pas touche. Lance par `make up`.
+  seed_walls:
+    profiles: ['seed']
+    image: ghcr.io/plic-mti-highfive/highfive-backend-canvas:${CANVAS_VERSION:-latest}
+    restart: "no"
+    working_dir: /app
+    command: ["node", "seed-walls.mjs"]
+    volumes:
+      - ./scripts/seed-walls.mjs:/app/seed-walls.mjs:ro
+    environment:
+      API_URL: http://backend_core:3000
+      CANVAS_WS_URL: ws://backend_canvas:8585
+    depends_on:
+      backend_core:
+        condition: service_healthy
+      backend_canvas:
+        condition: service_healthy
+
   # 6. DATABASE
   db:
     image: pgvector/pgvector:pg16
